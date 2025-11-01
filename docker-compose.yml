@@ -39,6 +39,9 @@ services:
             # Disables email confirmation requirement
             EMAIL_CONFIRMATION_DISABLED: 'true'
 
+            OVERLEAF_ADMIN_EMAIL: youremail@example.com
+            OVERLEAF_ALLOW_SIGNUPS: 'true'
+
             ## Set for SSL via nginx-proxy
             #VIRTUAL_HOST: 103.112.212.22
 
