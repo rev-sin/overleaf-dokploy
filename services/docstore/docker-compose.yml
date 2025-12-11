@@ -11,6 +11,7 @@ services:
       - ../../libraries:/overleaf/libraries
       - ../../bin/shared/wait_for_it:/overleaf/bin/shared/wait_for_it
       - ../../tools/migrations:/overleaf/tools/migrations
+      - ../../tsconfig.backend.json:/overleaf/tsconfig.backend.json
     working_dir: /overleaf/services/docstore
     environment:
       MOCHA_GREP: ${MOCHA_GREP}
@@ -70,8 +71,8 @@ services:
       - mongo:127.0.0.1
 
   gcs:
-    image: fsouza/fake-gcs-server:1.45.2
-    command: ["--port=9090", "--scheme=http"]
+    image: fsouza/fake-gcs-server:1.52.3
+    command: ["--port=9090", "--scheme=http", "--external-url=http://gcs:9090"]
     healthcheck:
       test: wget --quiet --output-document=/dev/null http://localhost:9090/storage/v1/b
       interval: 1s

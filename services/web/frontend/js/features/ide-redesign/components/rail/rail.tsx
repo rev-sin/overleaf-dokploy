@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useMemo } from 'react'
+import { useCallback, useEffect, useMemo, useRef } from 'react'
 import { useTranslation } from 'react-i18next'
 import { Nav, TabContainer } from 'react-bootstrap'
 import { useLayoutContext } from '@/shared/context/layout-context'
@@ -26,6 +26,18 @@ import RailResizeHandle from './rail-resize-handle'
 import RailModals from './rail-modals'
 import RailOverflowDropdown from './rail-overflow-dropdown'
 import useRailOverflow from '../../hooks/use-rail-overflow'
+import EditorTourRailTooltip from '../editor-tour/editor-tour-rail-tooltip'
+import importOverleafModules from '../../../../../macros/import-overleaf-module.macro'
+import EditorTourThemeTooltip from '../editor-tour/editor-tour-theme-tooltip'
+import EditorTourSwitchBackTooltip from '../editor-tour/editor-tour-switch-back-tooltip'
+import { shouldIncludeRailTab } from '../../utils/rail-utils'
+
+const moduleRailEntries = (
+  importOverleafModules('railEntries') as {
+    import: { default: RailElement }
+    path: string
+  }[]
+).map(({ import: { default: element } }) => element)
 
 export const RailLayout = () => {
   const { sendEvent } = useEditorAnalytics()
@@ -39,6 +51,9 @@ export const RailLayout = () => {
 
   const isHistoryView = view === 'history'
 
+  const fileTreeRef = useRef<HTMLAnchorElement>(null)
+  const settingsRef = useRef<HTMLButtonElement>(null)
+
   const railTabs: RailElement[] = useMemo(
     () => [
       {
@@ -49,6 +64,7 @@ export const RailLayout = () => {
         // NOTE: We always need to mount the file tree on first load
         // since it is responsible for opening the initial document.
         mountOnFirstLoad: true,
+        ref: fileTreeRef,
       },
       {
         key: 'full-project-search',
@@ -79,6 +95,7 @@ export const RailLayout = () => {
         title: t('chat'),
         hide: !getMeta('ol-capabilities')?.includes('chat'),
       },
+      ...moduleRailEntries,
     ],
     [t, features.trackChangesVisible, view]
   )
@@ -99,6 +116,7 @@ export const RailLayout = () => {
           sendEvent('rail-click', { tab: 'settings' })
           setLeftMenuShown(true)
         },
+        ref: settingsRef,
       },
     ],
     [setLeftMenuShown, t, sendEvent]
@@ -125,7 +143,13 @@ export const RailLayout = () => {
       } else {
         // HACK: Apparently the onSelect event is triggered with href attributes
         // from DropdownItems
-        if (!railTabs.some(tab => !tab.hide && tab.key === key)) {
+        if (
+          !railTabs.some(tab =>
+            typeof tab.hide === 'function'
+              ? !tab.hide()
+              : !tab.hide && tab.key === key
+          )
+        ) {
           // Attempting to open a non-existent tab
           return
         }
@@ -150,7 +174,9 @@ export const RailLayout = () => {
   )
 
   useEffect(() => {
-    const validTabKeys = railTabs.filter(tab => !tab.hide).map(tab => tab.key)
+    const validTabKeys = railTabs
+      .filter(shouldIncludeRailTab)
+      .map(tab => tab.key)
     if (!validTabKeys.includes(selectedTab) && isOpen) {
       // If the selected tab is no longer valid (e.g. due to permissions changes),
       // switch back to the file tree
@@ -199,8 +225,8 @@ export const RailLayout = () => {
         <Nav activeKey={selectedTab} className="ide-rail-tabs-nav">
           <div className="ide-rail-tabs-wrapper" ref={tabWrapperRef}>
             {tabsInRail
-              .filter(({ hide }) => !hide)
-              .map(({ icon, key, indicator, title, disabled }) => (
+              .filter(shouldIncludeRailTab)
+              .map(({ icon, key, indicator, title, disabled, ref }) => (
                 <RailTab
                   open={isOpen && selectedTab === key}
                   key={key}
@@ -209,17 +235,25 @@ export const RailLayout = () => {
                   indicator={indicator}
                   title={title}
                   disabled={disabled}
+                  ref={ref}
                 />
               ))}
             <RailActionElement key="more-options" action={moreOptionsAction} />
           </div>
           <nav aria-label={t('help_editor_settings')}>
             {railActions.map(action => (
-              <RailActionElement key={action.key} action={action} />
+              <RailActionElement
+                key={action.key}
+                action={action}
+                ref={action.ref}
+              />
             ))}
           </nav>
         </Nav>
       </nav>
+      <EditorTourRailTooltip target={fileTreeRef.current} />
+      <EditorTourThemeTooltip target={settingsRef.current} />
+      <EditorTourSwitchBackTooltip target={settingsRef.current} />
       <RailPanel
         isReviewPanelOpen={isReviewPanelOpen}
         isHistoryView={isHistoryView}

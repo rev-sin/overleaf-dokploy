@@ -1,26 +1,27 @@
-import { db, ObjectId } from '../../infrastructure/mongodb.js'
+import { db, ObjectId } from '../../infrastructure/mongodb.mjs'
 import { callbackify } from '@overleaf/promise-utils'
-import { Subscription } from '../../models/Subscription.js'
+import { Subscription } from '../../models/Subscription.mjs'
 import SubscriptionLocator from './SubscriptionLocator.mjs'
 import PlansLocator from './PlansLocator.mjs'
 import FeaturesUpdater from './FeaturesUpdater.mjs'
 import FeaturesHelper from './FeaturesHelper.mjs'
 import AnalyticsManager from '../Analytics/AnalyticsManager.mjs'
-import { DeletedSubscription } from '../../models/DeletedSubscription.js'
+import { DeletedSubscription } from '../../models/DeletedSubscription.mjs'
 import logger from '@overleaf/logger'
-import Features from '../../infrastructure/Features.js'
+import Features from '../../infrastructure/Features.mjs'
 import UserAuditLogHandler from '../User/UserAuditLogHandler.mjs'
 import UserUpdater from '../User/UserUpdater.mjs'
 import AccountMappingHelper from '../Analytics/AccountMappingHelper.mjs'
-import { SSOConfig } from '../../models/SSOConfig.js'
-import mongoose from '../../infrastructure/Mongoose.js'
-import Modules from '../../infrastructure/Modules.js'
+import { SSOConfig } from '../../models/SSOConfig.mjs'
+import mongoose from '../../infrastructure/Mongoose.mjs'
+import Modules from '../../infrastructure/Modules.mjs'
 
 /**
  * @typedef {import('../../../../types/subscription/dashboard/subscription').Subscription} Subscription
  * @typedef {import('../../../../types/subscription/dashboard/subscription').PaymentProvider} PaymentProvider
  * @typedef {import('../../../../types/group-management/group-audit-log').GroupAuditLog} GroupAuditLog
  * @import { AddOn } from '../../../../types/subscription/plan'
+ * @typedef {InstanceType<Subscription>} MongoSubscription
  */
 
 /**
@@ -529,6 +530,38 @@ async function setRestorePoint(subscriptionId, planCode, addOns, consumed) {
 }
 
 /**
+ * Change the ownershiop of the given subscription.
+ * @param {MongoSubscription} subscription
+ * @param {string} adminId
+ * @param {boolean} clearPreviousPaymentProvider whether to clear the previousPaymentProvider field or set it to the current paymentProvider
+ */
+async function transferSubscriptionOwnership(
+  subscription,
+  adminId,
+  clearPreviousPaymentProvider
+) {
+  const query = {
+    _id: new ObjectId(subscription._id),
+  }
+
+  const update = {
+    $set: { admin_id: new ObjectId(adminId) },
+  }
+  if (subscription.groupPlan) {
+    update.$addToSet = { manager_ids: new ObjectId(adminId) }
+  } else {
+    update.$set.manager_ids = [new ObjectId(adminId)]
+  }
+
+  if (clearPreviousPaymentProvider) {
+    update.$unset = { previousPaymentProvider: 1 }
+  } else {
+    update.$set.previousPaymentProvider = subscription.paymentProvider
+  }
+  await Subscription.updateOne(query, update).exec()
+}
+
+/**
  * Clears the restore point for a given subscription, and signals that the subscription was sucessfully reverted.
  *
  * @async
@@ -588,5 +621,6 @@ export default {
     setSubscriptionWasReverted,
     voidRestorePoint,
     handleExpiredSubscription,
+    transferSubscriptionOwnership,
   },
 }

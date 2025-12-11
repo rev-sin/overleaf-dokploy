@@ -1,6 +1,6 @@
 import { beforeEach, describe, it, vi, expect } from 'vitest'
 
-import path from 'path'
+import path from 'node:path'
 import sinon from 'sinon'
 import mongodb from 'mongodb-legacy'
 const { ObjectId } = mongodb
@@ -215,6 +215,7 @@ describe('ProjectController', function () {
       getSurvey: sinon.stub().yields(null, {}),
     }
     ctx.ProjectAuditLogHandler = {
+      addEntryIfManagedInBackground: sinon.stub().resolves(),
       promises: {
         addEntry: sinon.stub().resolves(),
       },
@@ -749,6 +750,18 @@ describe('ProjectController', function () {
           ctx.ProjectCreationHandler.promises.createBasicProject
             .calledWith(ctx.user._id, ctx.projectName)
             .should.equal(true)
+          resolve()
+        }
+        ctx.ProjectController.newProject(ctx.req, ctx.res)
+      })
+    })
+
+    it('adds project audit log for managed for managed users', async function (ctx) {
+      await new Promise(resolve => {
+        ctx.req.body.template = 'basic'
+        ctx.res.json = () => {
+          expect(ctx.ProjectAuditLogHandler.addEntryIfManagedInBackground).to
+            .have.been.called
           resolve()
         }
         ctx.ProjectController.newProject(ctx.req, ctx.res)

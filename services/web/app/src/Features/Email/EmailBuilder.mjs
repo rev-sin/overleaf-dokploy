@@ -1,12 +1,12 @@
 import _ from 'lodash'
 import settings from '@overleaf/settings'
 import moment from 'moment'
-import EmailMessageHelper from './EmailMessageHelper.js'
+import EmailMessageHelper from './EmailMessageHelper.mjs'
 import StringHelper from '../Helpers/StringHelper.mjs'
-import BaseWithHeaderEmailLayout from './Layouts/BaseWithHeaderEmailLayout.js'
+import BaseWithHeaderEmailLayout from './Layouts/BaseWithHeaderEmailLayout.mjs'
 import SpamSafe from './SpamSafe.mjs'
-import ctaEmailBody from './Bodies/cta-email.js'
-import NoCTAEmailBody from './Bodies/NoCTAEmailBody.js'
+import ctaEmailBody from './Bodies/cta-email.mjs'
+import NoCTAEmailBody from './Bodies/NoCTAEmailBody.mjs'
 
 function _emailBodyPlainText(content, opts, ctaEmail) {
   let emailBody = `${content.greeting(opts, true)}`
@@ -178,6 +178,26 @@ templates.canceledSubscription = ctaTemplate({
   },
   ctaURL(opts) {
     return 'https://docs.google.com/forms/d/e/1FAIpQLSfa7z_s-cucRRXm70N4jEcSbFsZeb0yuKThHGQL8ySEaQzF0Q/viewform?usp=sf_link'
+  },
+})
+
+templates.canceledSubscriptionOrAddOn = ctaTemplate({
+  subject() {
+    return `${settings.appName} thoughts`
+  },
+  message() {
+    return [
+      `We are sorry to see you cancelled your ${settings.appName} subscription. Would you mind giving us some feedback on what the site is lacking at the moment via this quick survey?`,
+    ]
+  },
+  secondaryMessage() {
+    return ['Thank you in advance!']
+  },
+  ctaText() {
+    return 'Leave feedback'
+  },
+  ctaURL(opts) {
+    return 'https://digitalscience.qualtrics.com/jfe/form/SV_2n2aSlWgvoxXdGK'
   },
 })
 
@@ -1000,6 +1020,36 @@ templates.taxExemptCertificateRequired = NoCTAEmailTemplate({
       '<br/>',
       `Our reference: ${opts.stripeCustomerId}`,
     ]
+  },
+})
+
+templates.groupMemberLimitWarning = ctaTemplate({
+  subject(opts) {
+    return `${opts.groupName || 'Your group'} is approaching its member limit`
+  },
+  title(opts) {
+    return `${opts.groupName || 'Your group'} is approaching its member limit`
+  },
+  greeting(opts) {
+    return opts.firstName ? `Hi ${opts.firstName},` : 'Hi,'
+  },
+  message(opts) {
+    return [
+      `Your group "${opts.groupName}" is approaching its member limit.`,
+      `<b>Current usage:</b> ${opts.currentMembers} of ${opts.membersLimit} licenses used (${opts.remainingSeats} remaining)`,
+      'With domain capture enabled, users with verified email addresses from your domain can automatically join the group via SSO. Once the member limit is reached, new users will be blocked from joining.',
+    ]
+  },
+  secondaryMessage() {
+    return [
+      'To ensure uninterrupted access for your users, consider adding more licenses or removing inactive members.',
+    ]
+  },
+  ctaText() {
+    return 'Add licenses'
+  },
+  ctaURL() {
+    return `${settings.siteUrl}/user/subscription/group/add-users`
   },
 })
 

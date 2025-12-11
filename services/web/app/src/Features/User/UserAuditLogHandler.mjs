@@ -1,6 +1,6 @@
 import OError from '@overleaf/o-error'
 import logger from '@overleaf/logger'
-import { UserAuditLogEntry } from '../../models/UserAuditLogEntry.js'
+import { UserAuditLogEntry } from '../../models/UserAuditLogEntry.mjs'
 import { callbackify } from 'node:util'
 import SubscriptionLocator from '../Subscription/SubscriptionLocator.mjs'
 
@@ -32,7 +32,19 @@ function _canHaveNoInitiatorId(operation, info) {
 }
 
 // events that are visible to managed user admins in Group Audit Logs view
-const MANAGED_GROUP_USER_EVENTS = ['login', 'reset-password', 'update-password']
+const MANAGED_GROUP_USER_EVENTS = [
+  'login',
+  'reset-password',
+  'update-password',
+  'link-dropbox',
+  'unlink-dropbox',
+  'link-github',
+  'unlink-github',
+  'delete-account',
+  'leave-group-subscription',
+  'integration-account-linked',
+  'integration-account-unlinked',
+]
 
 /**
  * Add an audit log entry
@@ -92,12 +104,29 @@ async function addEntry(userId, operation, initiatorId, ipAddress, info = {}) {
   await UserAuditLogEntry.create(entry)
 }
 
+function addEntryInBackground(
+  userId,
+  operation,
+  initiatorId,
+  ipAddress,
+  info = {}
+) {
+  // Intentionally not awaited
+  addEntry(userId, operation, initiatorId, ipAddress, info).catch(err => {
+    logger.error(
+      { err, userId, operation, initiatorId, ipAddress, info },
+      'error adding user audit log entry'
+    )
+  })
+}
+
 const UserAuditLogHandler = {
   MANAGED_GROUP_USER_EVENTS,
   addEntry: callbackify(addEntry),
   promises: {
     addEntry,
   },
+  addEntryInBackground,
 }
 
 export default UserAuditLogHandler

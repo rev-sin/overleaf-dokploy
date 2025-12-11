@@ -74,6 +74,12 @@ export async function uploadBlobToBackup(historyId, blob, path, persistor) {
   let backupSource
   let contentEncoding
   let size
+  const timer = setTimeout(function () {
+    logger.warn(
+      { historyId, blob, path, size },
+      'blob upload still active after 1 minute'
+    )
+  }, 60 * 1000)
   try {
     if (blob.getStringLength()) {
       backupSource = filePathCompressed
@@ -109,6 +115,7 @@ export async function uploadBlobToBackup(historyId, blob, path, persistor) {
       }
     )
   } finally {
+    clearTimeout(timer)
     if (backupSource === filePathCompressed) {
       try {
         await fs.promises.rm(filePathCompressed, { force: true })
@@ -160,7 +167,7 @@ export async function storeBlobBackup(projectId, hash) {
  * @return {Promise<*>}
  * @private
  */
-export async function _blobIsBackedUp(projectId, hash) {
+export async function blobIsBackedUp(projectId, hash) {
   const blobs = await backedUpBlobs.findOne(
     {
       _id: new ObjectId(projectId),
@@ -178,7 +185,7 @@ export async function _blobIsBackedUp(projectId, hash) {
  * @param {Blob} blob - The blob that is being backed up
  * @param {string} tmpPath - The path to a temporary file storing the contents of the blob.
  * @param {CachedPerProjectEncryptedS3Persistor} [persistor] - The persistor to use (optional)
- * @return {Promise<void>}
+ * @return {Promise<string|void>}
  */
 export async function backupBlob(historyId, blob, tmpPath, persistor) {
   const hash = blob.getHash()
@@ -193,17 +200,17 @@ export async function backupBlob(historyId, blob, tmpPath, persistor) {
   if (globalBlob && !globalBlob.demoted) {
     recordBackupConclusion('skipped', 'global')
     logger.debug({ projectId, hash }, 'Blob is global - skipping backup')
-    return
+    return 'global'
   }
 
   try {
-    if (await _blobIsBackedUp(projectId, hash)) {
+    if (await blobIsBackedUp(projectId, hash)) {
       recordBackupConclusion('skipped', 'already_backed_up')
       logger.debug(
         { projectId, hash },
         'Blob already backed up - skipping backup'
       )
-      return
+      return 'already-recorded'
     }
   } catch (error) {
     logger.warn({ error }, 'Failed to check if blob is backed up')
@@ -233,11 +240,13 @@ export async function backupBlob(historyId, blob, tmpPath, persistor) {
       // record that we backed it up already
       await storeBlobBackup(projectId, hash)
       recordBackupConclusion('failure', 'already_backed_up')
-      return
+      // Blob already backed up so report success
+      return 'already-written'
     }
-    // eventually queue this for retry - for now this will be fixed by running the script
     recordBackupConclusion('failure')
     logger.warn({ error, projectId, hash }, 'Failed to upload blob to backup')
+    // Always throw an exception if the blob is not backed up
+    throw error
   } finally {
     logger.debug({ projectId, hash }, 'Ended blob backup')
   }

@@ -17,10 +17,8 @@ body {
 }
 
 .project-ds-nav-page {
-  display: flex;
-  flex-direction: column;
-  height: 100vh;
-  height: 100dvh;
+  @include full-height-stacked-page;
+
   color: var(--content-secondary);
 
   // NOTE-AC: This code can be eliminated when we remove sidebar-navigation-ui-update
@@ -179,6 +177,10 @@ body {
       .project-list-sidebar-survey-wrapper .user-notifications {
         margin-bottom: var(--spacing-05);
       }
+    }
+
+    hr {
+      border-top: 1px solid var(--border-divider-themed);
     }
 
     ul.project-list-filters {
